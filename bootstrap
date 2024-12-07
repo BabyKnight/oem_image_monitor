@@ -1,0 +1,92 @@
+#!/bin/bash
+
+TRUSTED_HOST="pypi.doubanio.com"
+INDEX_URL="http://pypi.doubanio.com/simple/"
+
+required_pkg=("python3-pip" "python3-venv")
+
+function install_sys_pkg()
+{
+		for pkg in "${required_pkg[@]}"
+		do
+				# make sure package is installed
+				echo "Check if [$pkg] is installed..."
+
+				if [ `dpkg -l | grep $pkg | wc -l` -ne 0 ]; then
+						echo "[*] INSTALLED"
+				else
+						echo "[ ] NOT INSTALLED"
+						sudo apt install $pkg
+				fi
+		done
+}
+
+
+function get_and_set_env()
+{
+	PROJECT_ROOT_PATH=$(pwd)
+	DJANGO_PROJECT_PATH="$PROJECT_ROOT_PATH/apps"
+
+	echo "PROJECT_ROOT_PATH is - [ $PROJECT_ROOT_PATH ]"
+	echo "DJANGO_PROJECT_PATH is - [ $DJANGO_PROJECT_PATH ]"
+
+	# save project root path and django project path into file
+	# always rewrite the path env to file
+	echo "PROJECT_ROOT_PATH=$PROJECT_ROOT_PATH" > "$PROJECT_ROOT_PATH/scripts/path_env"
+	echo "DJANGO_PROJECT_PATH=$DJANGO_PROJECT_PATH" >> "$PROJECT_ROOT_PATH/scripts/path_env"
+
+	echo "PATH ENV save successfully!"
+}
+
+
+function clean()
+{
+    # clean up existing virtual env
+    set -x
+    rm activate
+    rm -rf environ
+    set +x
+    echo "Clean up virtual env, Done!"
+}
+
+
+function boot()
+{
+	# check and install python virtual env
+	install_sys_pkg
+
+	# create virtual env and install python pakage
+	if [ ! -d "environ" ]; then
+			# using python3 built-in venv module
+			python3 -m venv ./environ
+	fi
+
+	source  environ/bin/activate
+
+	pip3 install --upgrade -i $INDEX_URL --trusted-host $TRUSTED_HOST -r requirements.txt \
+				|| die "Could not install python packages ! Cannot continue"
+}
+
+
+show_usage() {
+    echo "Usage: $0 [--clean] / [None]"
+    exit 1
+}
+
+
+if (( ! "$#" ));then
+    boot
+else
+     case "$1" in
+        --clean)
+            clean
+            ;;
+        --help)
+            show_usage
+            ;;
+        *)
+			echo "Invalid arguments"
+            show_usage
+            ;;
+    esac
+fi
