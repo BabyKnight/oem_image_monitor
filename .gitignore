@@ -6,4 +6,7 @@ __pycache__/
 # C extensions
 *.so
 
+# txt report file
+*.txt
+
 environ/
