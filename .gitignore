@@ -11,3 +11,5 @@ __pycache__/
 *.txt
 
 environ/
+image_info
+session

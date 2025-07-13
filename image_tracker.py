@@ -12,6 +12,7 @@ from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.firefox.options import Options
 
 SAVED_SESSION = 'session'
+IMAGE_INFO = 'image_info'
 BASE_URL = 'https://oem-share.canonical.com/partners/somerville/share/releases/noble/'
 
 
@@ -150,6 +151,9 @@ class ImageTracker:
 
         print(image_info)
         print(json.dumps(image_info, indent=4, ensure_ascii=False))
+
+        with open(IMAGE_INFO, 'w', encoding='utf-8') as f:
+            json.dump(image_info, f, indent=4, ensure_ascii=False)
 
     def is_session_expire(self, res):
         if res.url == "https://oem-share.canonical.com/openid/+login" or "OpenID Authentication Required" in res.text:
