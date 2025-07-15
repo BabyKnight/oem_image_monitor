@@ -13,6 +13,7 @@ from selenium.webdriver.firefox.options import Options
 
 SAVED_SESSION = 'session'
 RELEASED_IMAGE_DATA = 'released_image_data'
+IMAGE_DOWNLOAD_QUEUE = 'image_download_queue'
 BASE_URL = 'https://oem-share.canonical.com/partners/somerville/share/releases/noble/'
 
 
@@ -147,15 +148,15 @@ class ImageTracker:
             sys.exit(-1)
 
         img_cate_dict = self.parse_category(response.text)
-        for key, value in img_cate_dict.items():
-            print(key + " - " + value['link'])
-            #self.parse_image_by_category(value['link'])
-            self.img_release_history[key] = self.parse_image_by_category(value['link'])
+        for cate, v in img_cate_dict.items():
+            print(cate + " - " + v['link'])
+            self.img_release_history[cate] = self.parse_image_by_category(cate, v['link'])
 
         print(self.img_release_history)
         print(json.dumps(self.img_release_history, indent=4, ensure_ascii=False))
 
         self.save_img_release_hist()
+        self.save_img_download_queue()
 
 
     def is_session_expire(self, res):
@@ -184,7 +185,7 @@ class ImageTracker:
 
         return img_cate_dict
         
-    def parse_image_by_category(self, url):
+    def parse_image_by_category(self, cate, url):
         """
         method to parse image by category
         return a list of image info by a individual category
@@ -220,6 +221,13 @@ class ImageTracker:
                                 "image_filename": image_filename,
                                 "image_link": image_link,
                                 })
+                            if not any(d.get('image_filename') == image_filename for d in self.img_release_history[cate]):
+                                print('                   ---' + image_filename + ' is not downloaded yet,  add to the queue')
+                                self.img_download_queue.append({
+                                    "image_filename": image_filename,
+                                    "image_link": image_link,
+                                    })
+
                         if '.sha256sum' in a.get_text(strip=True):
                             checksum_filename = a.get_text(strip=True)
                         if '.sbom' in a.get_text(strip=True):
@@ -246,6 +254,11 @@ class ImageTracker:
         # create a new file if not exists
         with open(RELEASED_IMAGE_DATA, 'w', encoding='utf-8') as f:
             json.dump(self.img_release_history, f, indent=4, ensure_ascii=False)
+
+    def save_img_download_queue(self):
+        # create a new file if not exists, overwrite if file exists
+        with open(IMAGE_DOWNLOAD_QUEUE, 'w', encoding='utf-8') as f:
+            json.dump(self.img_download_queue, f, indent=4, ensure_ascii=False)
 
 
 if __name__ == '__main__':

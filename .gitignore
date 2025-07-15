@@ -12,4 +12,5 @@ __pycache__/
 
 environ/
 released_image_data
+image_download_queue
 session
