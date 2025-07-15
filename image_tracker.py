@@ -12,7 +12,7 @@ from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.firefox.options import Options
 
 SAVED_SESSION = 'session'
-IMAGE_INFO = 'image_info'
+RELEASED_IMAGE_DATA = 'released_image_data'
 BASE_URL = 'https://oem-share.canonical.com/partners/somerville/share/releases/noble/'
 
 
@@ -46,6 +46,8 @@ class ImageTracker:
     default_wait_sec = 10
     driver = None
     session = None
+    img_release_history = {}
+    img_download_queue = []
 
     def __wait_for_page_loading(self):
         # wait for the page loading
@@ -112,8 +114,9 @@ class ImageTracker:
         """
         Method to check for the image release status
         """
+        self.get_img_release_hist()
+
         # check if saved session available
-        image_info = {}
         if not os.path.exists(SAVED_SESSION):
             print("No saved session found, re-login and saving...")
             self.update_session()
@@ -147,13 +150,13 @@ class ImageTracker:
         for key, value in img_cate_dict.items():
             print(key + " - " + value['link'])
             #self.parse_image_by_category(value['link'])
-            image_info[key] = self.parse_image_by_category(value['link'])
+            self.img_release_history[key] = self.parse_image_by_category(value['link'])
 
-        print(image_info)
-        print(json.dumps(image_info, indent=4, ensure_ascii=False))
+        print(self.img_release_history)
+        print(json.dumps(self.img_release_history, indent=4, ensure_ascii=False))
 
-        with open(IMAGE_INFO, 'w', encoding='utf-8') as f:
-            json.dump(image_info, f, indent=4, ensure_ascii=False)
+        self.save_img_release_hist()
+
 
     def is_session_expire(self, res):
         if res.url == "https://oem-share.canonical.com/openid/+login" or "OpenID Authentication Required" in res.text:
@@ -223,6 +226,26 @@ class ImageTracker:
                             sbom_filename = a.get_text(strip=True)
                         
         return image_info_list
+
+    def get_img_release_hist(self):
+        """
+        Method to read the image release history
+        Return/initial a json data which cal be used for checking if image has been recorded & downloaded
+        """
+        # if the file for history data is not exist, leave it for saving method to create the file
+        if os.path.exists(RELEASED_IMAGE_DATA):
+            with open(RELEASED_IMAGE_DATA, 'r', encoding='utf-8') as f:
+                self.img_release_history = json.load(f)
+                print('Released image data history found in local.')
+
+    def save_img_release_hist(self):
+        """
+        Method to set/save the released image data to local
+        """
+        print('Saving the released image data to local')
+        # create a new file if not exists
+        with open(RELEASED_IMAGE_DATA, 'w', encoding='utf-8') as f:
+            json.dump(self.img_release_history, f, indent=4, ensure_ascii=False)
 
 
 if __name__ == '__main__':

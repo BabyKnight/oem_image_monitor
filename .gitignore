@@ -11,5 +11,5 @@ __pycache__/
 *.txt
 
 environ/
-image_info
+released_image_data
 session
