@@ -260,6 +260,16 @@ class ImageTracker:
         with open(IMAGE_DOWNLOAD_QUEUE, 'w', encoding='utf-8') as f:
             json.dump(self.img_download_queue, f, indent=4, ensure_ascii=False)
 
+    def download_image_in_queue(self):
+        for image in self.img_download_queue:
+            with requests.get(image['image_link'], stream=True) as res:
+                res.raise_for_status()
+                with open(image['image_filename'], 'wb') as f:
+                    for chunk in res.iter_countent(chunk_size=1024*1024):
+                        if chunk:
+                            f.write(chunk)
+            print('image [' + image['image_filename'] + '] download complete.')
+
 
 if __name__ == '__main__':
     image_tracker = ImageTracker()
