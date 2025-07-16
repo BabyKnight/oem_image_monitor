@@ -152,11 +152,11 @@ class ImageTracker:
             print(cate + " - " + v['link'])
             self.img_release_history[cate] = self.parse_image_by_category(cate, v['link'])
 
-        print(self.img_release_history)
         print(json.dumps(self.img_release_history, indent=4, ensure_ascii=False))
 
         self.save_img_release_hist()
         self.save_img_download_queue()
+        self.download_image_in_queue()
 
 
     def is_session_expire(self, res):
@@ -221,7 +221,7 @@ class ImageTracker:
                                 "image_filename": image_filename,
                                 "image_link": image_link,
                                 })
-                            if not any(d.get('image_filename') == image_filename for d in self.img_release_history[cate]):
+                            if cate in self.img_release_history and not any(d.get('image_filename') == image_filename for d in self.img_release_history[cate]):
                                 print('                   ---' + image_filename + ' is not downloaded yet,  add to the queue')
                                 self.img_download_queue.append({
                                     "image_filename": image_filename,
@@ -265,10 +265,14 @@ class ImageTracker:
             with requests.get(image['image_link'], stream=True) as res:
                 res.raise_for_status()
                 with open(image['image_filename'], 'wb') as f:
-                    for chunk in res.iter_countent(chunk_size=1024*1024):
+                    for chunk in res.iter_content(chunk_size=1024*1024):
                         if chunk:
                             f.write(chunk)
             print('image [' + image['image_filename'] + '] download complete.')
+            # remove from the download queue in case any exception during next image download
+            self.img_download_queue.remove(image)
+            self.save_img_download_queue()
+
 
 
 if __name__ == '__main__':
