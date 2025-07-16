@@ -11,9 +11,12 @@ __pycache__/
 *.txt
 
 # iso image
-*.iso
+data/*.iso
 
+# cache data
+data/SESSION
+data/RELEASED_IMAGE_DATA
+data/IMAGE_DOWNLOAD_QUEUE
+
+# env
 environ/
-released_image_data
-image_download_queue
-session
