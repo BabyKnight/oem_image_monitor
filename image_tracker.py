@@ -13,13 +13,18 @@ from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.firefox.options import Options
 
 DATA_PATH = 'data'
+LOG_PATH = 'logs'
 SAVED_SESSION = os.path.join(DATA_PATH,'SESSION')
 RELEASED_IMAGE_DATA = os.path.join(DATA_PATH,'RELEASED_IMAGE_DATA')
 IMAGE_DOWNLOAD_QUEUE = os.path.join(DATA_PATH,'IMAGE_DOWNLOAD_QUEUE')
 BASE_URL = 'https://oem-share.canonical.com/partners/somerville/share/releases/noble/'
 
+
+if not os.path.exists(LOG_PATH):
+    os.makedirs(LOG_PATH)
+
 logging.basicConfig(
-    filename='image_tracker.log',
+    filename=LOG_PATH + '/image_tracker.log',
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'

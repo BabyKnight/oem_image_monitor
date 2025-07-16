@@ -18,5 +18,8 @@ data/SESSION
 data/RELEASED_IMAGE_DATA
 data/IMAGE_DOWNLOAD_QUEUE
 
+# log files
+logs/
+
 # env
 environ/
