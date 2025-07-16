@@ -1,19 +1,45 @@
 import ctypes
+import json
+import logging
+import os
+import requests
 import sys
 import time
+from bs4 import BeautifulSoup
 from datetime import date
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.firefox.options import Options
 
+DATA_PATH = 'data'
+LOG_PATH = 'logs'
+SAVED_SESSION = os.path.join(DATA_PATH,'SESSION')
+RELEASED_IMAGE_DATA = os.path.join(DATA_PATH,'RELEASED_IMAGE_DATA')
+IMAGE_DOWNLOAD_QUEUE = os.path.join(DATA_PATH,'IMAGE_DOWNLOAD_QUEUE')
+BASE_URL = 'https://oem-share.canonical.com/partners/somerville/share/releases/noble/'
+
+
+if not os.path.exists(LOG_PATH):
+    os.makedirs(LOG_PATH)
+
+logging.basicConfig(
+    filename=LOG_PATH + '/image_tracker.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
 
 def get_ubuntu_one_identity():
+    """
+    Method to get Ubuntu One identity from the library
+    """
     uo_identity = {
             'username': '',
             'password': '',
             }
-    print('Parsing Ubuntu One Identity...')
+    logging.info('Parsing Ubuntu One Identity')
     try:
         lib = ctypes.CDLL('./libuo_auth.so')
 
@@ -23,46 +49,60 @@ def get_ubuntu_one_identity():
         uo_identity['username'] = lib.get_username().decode('utf-8')
         uo_identity['password'] = lib.get_password().decode('utf-8')
     except OSError:
-        print("[Error] Missing launchpad identity library")
+        logging.error('Launchpad identity library not found')
         raise OSError
 
-    print('Successfully parsed user identity')
+    logging.info('Parsing user identity completed')
     return uo_identity
 
 
-class Monitor:
+class ImageMonitor:
+
     default_wait_sec = 10
-    image_dict = {}
-    image_category = {}
-    image_released_today = {}
-    display = True
-
-    def __init__(self, display=False):
-
-        self.display = display
-
-        options = Options()
-        if not display:
-            options.add_argument("--headless")
-
-        print('Initalizing Web Engine...')
-        service = Service('/snap/bin/geckodriver')
-        self.driver = webdriver.Firefox(service=service, options=options)
+    driver = None
+    session = None
+    img_release_history = {}
+    img_download_queue = []
 
     def __wait_for_page_loading(self):
         # wait for the page loading
-        print('Waiting for page loading complete...')
+        logging.info('Waiting for page load complete')
         time.sleep(self.default_wait_sec)
 
-    def lookup_for_image(self):
+    def update_session(self):
+        """
+        User user name and password to login the website, then get and save the session cookies data into local file
+        Note: this method will auto close the browser once get the cookies
+        """
+        self.login()
+        cookies = self.driver.get_cookies()
+        self.driver.quit()
+
+        with open(SAVED_SESSION, 'w', encoding='utf-8') as f:
+            json.dump(cookies, f, ensure_ascii=False)
+            logging.info('User session updated and saved')
+
+    def login(self):
+        """
+        Method to login
+        Note: Need to manually call the methon to close the browser - self.driver.quit()
+        """
         # get Ubuntu One Identity
+        logging.info('Starting login with given identity')
         try:
             uo_identity = get_ubuntu_one_identity()
         except OSError:
-            self.driver.quit()
             sys.exit(-1)
 
-        self.driver.get('https://oem-share.canonical.com/partners/somerville/share/releases/noble/')
+        options = Options()
+        # default to use headless mode without display
+        options.add_argument('--headless')
+
+        logging.info('Initalizing the Web Engine')
+        service = Service('/snap/bin/geckodriver')
+        self.driver = webdriver.Firefox(service=service, options=options)
+
+        self.driver.get(BASE_URL)
         self.driver.switch_to.window(self.driver.window_handles[0])
 
         self.__wait_for_page_loading()
@@ -84,74 +124,175 @@ class Monitor:
         login_btn_2.click()
 
         self.__wait_for_page_loading()
+        logging.info('User authenticated')
 
-        # find all image category
-        self.driver.find_elements(By.CSS_SELECTOR, 'tr')[3:-1]
+    def check_for_updates(self):
+        """
+        Method to check for the image release status
+        """
+        logging.info('Starting the task to check for image updates')
+        self.get_img_release_hist()
 
-        for i in self.driver.find_elements(By.CSS_SELECTOR, 'tr')[3:-1]:
-            category = i.find_element(By.CSS_SELECTOR,'a').text.rstrip('/')
-            # ignore the folder 'sideload'
-            if category == 'sideload':
-                continue
-            self.image_category[category] = i.find_element(By.CSS_SELECTOR,'a').get_property('href')
+        # check if saved session available
+        if not os.path.exists(SAVED_SESSION):
+            logging.info('Saved user session data not found')
+            self.update_session()
+        else:
+            logging.info('Saved user session data found')
 
-        # fetch all the image category, e.g. 24.04a, 24.04a-next, 24.04b, 24.04b-proposed
-        print('Image Category Found:')
-        for key in self.image_category.keys():
-            print('\t|-' + key)
+        with open(SAVED_SESSION, 'r', encoding='utf-8') as f:
+            content = f.read()
+        try:
+            cookies = json.loads(content)
+        except json.JSONDecodeError as e:
+            logging.warning('Json decode error in the cookie data of saved session', e)
+            logging.info('Starting re-generate the user session data')
+            self.update_session()
 
-        for img_cat, img_cat_url in self.image_category.items():
+        # initial/recover the session
+        logging.info('Initializing the session with saved session/cookies data')
+        self.session = requests.Session()
+        for cookie in cookies:
+            self.session.cookies.set(cookie['name'], cookie['value'])
+        response = self.session.get(BASE_URL)
 
-            self.image_dict[img_cat] = []
-            print(img_cat_url.rstrip('/').split('/')[-1])
+        # check if session expire
+        if self.is_session_expire(response):
+            self.update_session()
+            sys.exit(-1)
 
-            self.driver.get(img_cat_url)
-            time.sleep(5)
+        img_cate_dict = self.parse_category(response.text)
+        for cate, v in img_cate_dict.items():
+            logging.info('[' + cate + ']')
+            self.img_release_history[cate] = self.parse_image_by_category(cate, v['link'])
 
-            image_dir_link_list = []
-            # start from the 3rd elements since 0~2 are title and link for parent directory
-            elem_image_dir = self.driver.find_elements(By.CSS_SELECTOR, 'tr')[3:-1]
-            for i in elem_image_dir:
-                link = i.find_element(By.CLASS_NAME, 'indexcolname').find_element(By.CSS_SELECTOR, 'a').get_property('href')
-                image_dir_link_list.append(link)
+        self.save_img_release_hist()
+        self.save_img_download_queue()
+        self.download_image_in_queue()
+        logging.info('The task to check for image updates complete')
 
-            for i in image_dir_link_list:
-                dir_name = i.rstrip('/').split('/')[-1]
-                print("\t |- " + dir_name)
+    def is_session_expire(self, res):
+        if res.url == 'https://oem-share.canonical.com/openid/+login' or 'OpenID Authentication Required' in res.text:
+            logging.info('Session expire.')
+            return True
+        return False
 
-                # Check if iso image is released
-                self.driver.get(i)
-                time.sleep(5)
-                for file in self.driver.find_elements(By.CSS_SELECTOR, 'tr')[3:-1]:
-                    filename, last_modified = file.text.split()[:2]
-                    if '.iso' in filename:
-                        print("\t\t|-" + filename + " [" + last_modified + "]")
-                        self.image_dict[img_cat].append({'dir_name':dir_name, 'file_name':filename, 'last_modified': last_modified})
-                        if date.today() == date.fromisoformat(last_modified):
-                            self.image_released_today[filename] = i + filename
+    def parse_category(self, res):
+        """
+        parse the imaghe category and link
+        return a dict with <image_category>:<link>
+        """
+        img_cate_dict = {}
+        bs = BeautifulSoup(res, 'html.parser')
+        rows = bs.find_all('tr', class_=['odd', 'even'])
+        # bypass the 1st row since it's the link back to Parent Directory
+        for row in rows[1:]:
+            for a in row.find_all('a', href=True):
+                img_cate = a.get_text(strip=True).rstrip('/')
+                # skip when the folder name is 'sideload'
+                if img_cate != 'sideload':
+                    img_cate_dict[img_cate] = {
+                            'link': BASE_URL + a['href']
+                            }
 
-        self.driver.quit()
+        return img_cate_dict
+        
+    def parse_image_by_category(self, cate, url):
+        """
+        method to parse image by category
+        return a list of image info by a individual category
+        """
+        image_info_list = []
+        img_dict = {}
+        response = self.session.get(url)
+        bs = BeautifulSoup(response.text, 'html.parser')
 
-    def generate_report(self):
-        print("Generating report...")
+        rows = bs.find_all('tr', class_=['odd', 'even'])
+        # bypass the 1st row since it's the link back to Parent Directory
+        for row in rows[1:]:
+            for a in row.find_all('a', href=True):
+                img_dir = a.get_text(strip=True).rstrip('/')
+                img_dict[img_dir] = {
+                            'link': url + a['href']
+                        }
+                logging.info('  |- [' + img_dir +  ']')
+                response = self.session.get(url + a['href'])
+                bs = BeautifulSoup(response.text, 'html.parser')
 
-        with open("image_released_today.txt", "w") as file:
-            if not self.image_released_today:
-                print("No image released today!")
-            else:
-                for img, link in self.image_released_today.items():
-                    file.write("Image: " + img + "Download link: "+ link  +"\n")
+                rows = bs.find_all('tr', class_=['odd', 'even'])
+                # bypass the 1st row since it's the link back to Parent Directory
+                for row in rows[1:]:
+                    for a in row.find_all('a', href=True):
+                        logging.info('    |- ' + a.get_text(strip=True))
+
+                        if '.iso' in a.get_text(strip=True):
+                            image_filename = a.get_text(strip=True)
+                            image_link = response.url + image_filename
+                            logging.info('      |-' + image_link)
+                            image_info_list.append({
+                                'image_filename': image_filename,
+                                'image_link': image_link,
+                                })
+                            if cate in self.img_release_history and not any(d.get('image_filename') == image_filename for d in self.img_release_history[cate]):
+                                logging.info('        |-[' + image_filename + '] is not downloaded yet,  adding to the queue')
+                                self.img_download_queue.append({
+                                    'image_filename': image_filename,
+                                    'image_link': image_link,
+                                    })
+
+                        if '.sha256sum' in a.get_text(strip=True):
+                            checksum_filename = a.get_text(strip=True)
+                        if '.sbom' in a.get_text(strip=True):
+                            sbom_filename = a.get_text(strip=True)
+                        
+        return image_info_list
+
+    def get_img_release_hist(self):
+        """
+        Method to read the image release history
+        Return/initial a json data which cal be used for checking if image has been recorded & downloaded
+        """
+        # if the file for history data is not exist, leave it for saving method to create the file
+        if os.path.exists(RELEASED_IMAGE_DATA):
+            with open(RELEASED_IMAGE_DATA, 'r', encoding='utf-8') as f:
+                self.img_release_history = json.load(f)
+                logging.info('Image historical data found in local')
+
+    def save_img_release_hist(self):
+        """
+        Method to set/save the released image data to local
+        """
+        logging.info('Saving the image historical data to local')
+        # create a new file if not exists
+        with open(RELEASED_IMAGE_DATA, 'w', encoding='utf-8') as f:
+            json.dump(self.img_release_history, f, indent=4, ensure_ascii=False)
+
+    def save_img_download_queue(self):
+        # create a new file if not exists, overwrite if file exists
+        logging.info('Refreshing the image download queue')
+        logging.info('[' + str(len(self.img_download_queue)) + '] images in the download queue')
+        with open(IMAGE_DOWNLOAD_QUEUE, 'w', encoding='utf-8') as f:
+            json.dump(self.img_download_queue, f, indent=4, ensure_ascii=False)
+
+    def download_image_in_queue(self):
+        """
+        Method to download all the image set in the download queue
+        """
+        for image in self.img_download_queue:
+            with self.session.get(image['image_link'], stream=True) as res:
+                logging.info('Starting to download the new image [' + image['image_filename'] + ']')
+                res.raise_for_status()
+                with open(image['image_filename'], 'wb') as f:
+                    for chunk in res.iter_content(chunk_size=1024*1024):
+                        if chunk:
+                            f.write(chunk)
+            logging.info('Image [' + image['image_filename'] + '] download complete')
+            # remove from the download queue in case any exception during next image download
+            self.img_download_queue.remove(image)
+            self.save_img_download_queue()
 
 
 if __name__ == '__main__':
-
-    # accept a command line argument, program will running on Slience mode without open browser window by default, display browser with argu '-d'
-    display_mode = False
-    if len(sys.argv) > 1:
-        if sys.argv[1] == '-d':
-            display_mode = True
-
-    image_monitor = Monitor(display_mode)
-    image_monitor.lookup_for_image()
-    image_monitor.generate_report()
-    sys.exit(0)
+    image_tracker = ImageMonitor()
+    #image_tracker.update_session()
+    image_tracker.check_for_updates()
