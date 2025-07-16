@@ -69,9 +69,9 @@ class ImageMonitor:
         logging.info('Waiting for page load complete')
         time.sleep(self.default_wait_sec)
 
-    def update_session(self):
+    def update_cookie(self):
         """
-        User user name and password to login the website, then get and save the session cookies data into local file
+        Use user name and password to login the website, then get and save the session cookies data into local file
         Note: this method will auto close the browser once get the cookies
         """
         self.login()
@@ -80,7 +80,34 @@ class ImageMonitor:
 
         with open(SAVED_SESSION, 'w', encoding='utf-8') as f:
             json.dump(cookies, f, ensure_ascii=False)
-            logging.info('User session updated and saved')
+            logging.info('Cookies in session updated and saved')
+
+    def update_session(self):
+        """
+        Update the user session with saved cookie data or from webengine (driver)
+        """
+        # check if saved cookies available
+        if not os.path.exists(SAVED_SESSION):
+            logging.info('Saved cookie data not found')
+            self.update_cookie()
+        else:
+            logging.info('Saved cookie data found')
+
+        with open(SAVED_SESSION, 'r', encoding='utf-8') as f:
+            content = f.read()
+        try:
+            cookies = json.loads(content)
+        except json.JSONDecodeError as e:
+            logging.warning('Json decode error in the saved cookie data', e)
+            logging.info('Starting re-generate the user session cookie data')
+            self.update_cookie()
+
+        # initial/recover the session
+        logging.info('Initializing the session with saved cookies data')
+        self.session = requests.Session()
+        for cookie in cookies:
+            self.session.cookies.set(cookie['name'], cookie['value'])
+
 
     def login(self):
         """
@@ -133,33 +160,15 @@ class ImageMonitor:
         logging.info('Starting the task to check for image updates')
         self.get_img_release_hist()
 
-        # check if saved session available
-        if not os.path.exists(SAVED_SESSION):
-            logging.info('Saved user session data not found')
-            self.update_session()
-        else:
-            logging.info('Saved user session data found')
+        self.update_session()
 
-        with open(SAVED_SESSION, 'r', encoding='utf-8') as f:
-            content = f.read()
-        try:
-            cookies = json.loads(content)
-        except json.JSONDecodeError as e:
-            logging.warning('Json decode error in the cookie data of saved session', e)
-            logging.info('Starting re-generate the user session data')
-            self.update_session()
-
-        # initial/recover the session
-        logging.info('Initializing the session with saved session/cookies data')
-        self.session = requests.Session()
-        for cookie in cookies:
-            self.session.cookies.set(cookie['name'], cookie['value'])
         response = self.session.get(BASE_URL)
 
         # check if session expire
-        if self.is_session_expire(response):
+        while self.is_session_expire(response):
+            self.update_cookie()
             self.update_session()
-            sys.exit(-1)
+            response = self.session.get(BASE_URL)
 
         img_cate_dict = self.parse_category(response.text)
         for cate, v in img_cate_dict.items():
@@ -294,5 +303,4 @@ class ImageMonitor:
 
 if __name__ == '__main__':
     image_tracker = ImageMonitor()
-    #image_tracker.update_session()
     image_tracker.check_for_updates()
