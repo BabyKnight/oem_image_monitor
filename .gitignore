@@ -10,6 +10,9 @@ __pycache__/
 # txt report file
 *.txt
 
+# iso image
+*.iso
+
 environ/
 released_image_data
 image_download_queue

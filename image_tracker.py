@@ -261,8 +261,10 @@ class ImageTracker:
             json.dump(self.img_download_queue, f, indent=4, ensure_ascii=False)
 
     def download_image_in_queue(self):
+
         for image in self.img_download_queue:
-            with requests.get(image['image_link'], stream=True) as res:
+            with self.session.get(image['image_link'], stream=True) as res:
+                print('Start to download the new image...')
                 res.raise_for_status()
                 with open(image['image_filename'], 'wb') as f:
                     for chunk in res.iter_content(chunk_size=1024*1024):
