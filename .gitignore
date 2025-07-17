@@ -14,7 +14,7 @@ __pycache__/
 data/*.iso
 
 # cache data
-data/SESSION
+data/SESSION_DATA
 data/RELEASED_IMAGE_DATA
 data/IMAGE_DOWNLOAD_QUEUE
 

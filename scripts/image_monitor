@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# OEM Image Monitor's command-line utility
+
+SCRIPT_DIR=$(unset CDPATH && cd "$(dirname "$0")" && pwd)
+
+UTILITY_ROOT_DIR=$(dirname "$SCRIPT_DIR")
+
+PYTHON_SCRIPT="$UTILITY_ROOT_DIR/image_monitor.py"
+
+VIRTUAL_ENV_ACTIVATE="$UTILITY_ROOT_DIR/environ/bin/activate"
+
+if [ ! -f "$VIRTUAL_ENV_ACTIVATE" ]; then
+	ehco "Virtual env not found: $VIRTUAL_ENV_ACTIVATE"
+	echo "Please run ./bootstrap first"
+	exit 1
+fi
+
+source "$VIRTUAL_ENV_ACTIVATE"
+
+python "$PYTHON_SCRIPT" "$@"

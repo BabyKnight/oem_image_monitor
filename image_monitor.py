@@ -14,7 +14,7 @@ from selenium.webdriver.firefox.options import Options
 
 DATA_PATH = 'data'
 LOG_PATH = 'logs'
-SAVED_SESSION = os.path.join(DATA_PATH,'SESSION')
+SAVED_COOKIES = os.path.join(DATA_PATH,'SESSION_DATA')
 RELEASED_IMAGE_DATA = os.path.join(DATA_PATH,'RELEASED_IMAGE_DATA')
 IMAGE_DOWNLOAD_QUEUE = os.path.join(DATA_PATH,'IMAGE_DOWNLOAD_QUEUE')
 BASE_URL = 'https://oem-share.canonical.com/partners/somerville/share/releases/noble/'
@@ -78,7 +78,7 @@ class ImageMonitor:
         cookies = self.driver.get_cookies()
         self.driver.quit()
 
-        with open(SAVED_SESSION, 'w', encoding='utf-8') as f:
+        with open(SAVED_COOKIES, 'w', encoding='utf-8') as f:
             json.dump(cookies, f, ensure_ascii=False)
             logging.info('Cookies in session updated and saved')
 
@@ -87,13 +87,13 @@ class ImageMonitor:
         Update the user session with saved cookie data or from webengine (driver)
         """
         # check if saved cookies available
-        if not os.path.exists(SAVED_SESSION):
+        if not os.path.exists(SAVED_COOKIES):
             logging.info('Saved cookie data not found')
             self.update_cookie()
         else:
             logging.info('Saved cookie data found')
 
-        with open(SAVED_SESSION, 'r', encoding='utf-8') as f:
+        with open(SAVED_COOKIES, 'r', encoding='utf-8') as f:
             content = f.read()
         try:
             cookies = json.loads(content)
@@ -304,3 +304,4 @@ class ImageMonitor:
 if __name__ == '__main__':
     image_tracker = ImageMonitor()
     image_tracker.check_for_updates()
+    sys.exit(0)

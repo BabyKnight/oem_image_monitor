@@ -10,6 +10,8 @@ OEM image monitor is a tool to monitor the Ubuntu OEM image release status.
 
 - C library to store the (Ubuntu One) credentical
 
+- Bash script of command line utility
+
 ## Deployment
 
 - Clone the repoistory to local disk
@@ -26,16 +28,6 @@ OEM image monitor is a tool to monitor the Ubuntu OEM image release status.
 
 ## Usage
 
-The tool is currently support running on 2 different mode
+Use command line utility with below command:
 
-- Apply the virtual environment first before running the tool
-
-  - source environ/bin/activate
-
-- Running on default headless mode without browser window
-
-  - python3 image_monitor.py
-
-- Running on 'display' mode with browser window
-
-  - python3 image_monitor.py -d
+- ./scripts/image_monitor
