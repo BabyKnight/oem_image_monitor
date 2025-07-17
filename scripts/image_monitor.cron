@@ -1,0 +1,2 @@
+# Activity check oem image release status every Monday to Friday at 12:00 and 18:00
+0 12,18 * * 1-5 [FILE_PATH]/image_monitor
