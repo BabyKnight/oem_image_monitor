@@ -291,7 +291,7 @@ class ImageMonitor:
             with self.session.get(image['image_link'], stream=True) as res:
                 logging.info('Starting to download the new image [' + image['image_filename'] + ']')
                 res.raise_for_status()
-                with open(image['image_filename'], 'wb') as f:
+                with open(os.path.join(DATA_PATH,image['image_filename']), 'wb') as f:
                     for chunk in res.iter_content(chunk_size=1024*1024):
                         if chunk:
                             f.write(chunk)
