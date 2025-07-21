@@ -5,6 +5,7 @@ import os
 import requests
 import sys
 import time
+import yaml
 from bs4 import BeautifulSoup
 from datetime import date
 from selenium import webdriver
@@ -54,6 +55,48 @@ def get_ubuntu_one_identity():
 
     logging.info('Parsing user identity completed')
     return uo_identity
+
+
+def pasre_sbom(sbom_file, pkg_name=None):
+    """
+    Method to parse sbom from file
+        - if the package name is given, return the package version
+        - if the package name is not given, return all the packages version info
+    """
+    try:
+        with open(sbom_file, 'r', encoding='utf-8') as f:
+            sbom_data = yaml.safe_load(f)
+        logging.info('Parsing sbom file complete')
+
+        if pkg_name:
+            for package_name, details in sbom_data.items():
+                if pkg_name in package_name:
+                    pkg_version = details['version']
+                    return pkg_version
+
+        else:
+            pkg_ver_dict = {}
+
+            for package_name, details in sbom_data.items():
+                pkg_ver_dict[package_name] = details['version']
+            return pkg_ver_dict
+
+    except FileNotFoundError:
+        logging.error('no sbom file found')
+    except yaml.YAMLError as e:
+        logging.error('Parsing sbom error {e}')
+    except Exception as e:
+        logging.error('Unknown error {e}')
+
+
+def get_kernel_ver_from_sbom(sbom_file):
+    """
+    Method to get kernel version from a given sbom file
+     - Check the package name which start with 'linux-oem'
+        -e.g. linux-oem-6.11
+    """
+    kern_ver = pasre_sbom(sbom_file, 'linux-oem')
+    return kern_ver
 
 
 class ImageMonitor:
@@ -253,6 +296,15 @@ class ImageMonitor:
                             checksum_filename = a.get_text(strip=True)
                         if '.sbom' in a.get_text(strip=True):
                             sbom_filename = a.get_text(strip=True)
+                            sbom_link = response.url + sbom_filename
+                            sbom_temp = os.path.join(DATA_PATH,sbom_filename)
+
+                            if self.download_file(sbom_link, sbom_temp):
+                                kernel_version = get_kernel_ver_from_sbom(sbom_temp)
+                                image_info_list.append({
+                                    'kernel_version': kernel_version,
+                                })
+                                os.remove(sbom_temp)
                         
         return image_info_list
 
@@ -299,6 +351,21 @@ class ImageMonitor:
             # remove from the download queue in case any exception during next image download
             self.img_download_queue.remove(image)
             self.save_img_download_queue()
+
+    def download_file(self, url, target_file):
+        """
+        Method to download the small file to local
+        """
+        try:
+            response = self.session.get(url)
+            response.raise_for_status()
+            with open(target_file, 'wb') as f:
+                f.write(response.content)
+
+            return True
+        except Exception as e:
+            logging.error('File download fail with exception')
+            return False
 
 
 if __name__ == '__main__':
