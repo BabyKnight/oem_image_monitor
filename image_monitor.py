@@ -66,7 +66,6 @@ def pasre_sbom(sbom_file, pkg_name=None):
     try:
         with open(sbom_file, 'r', encoding='utf-8') as f:
             sbom_data = yaml.safe_load(f)
-        logging.info('Parsing sbom file complete')
 
         if pkg_name:
             for package_name, details in sbom_data.items():
@@ -267,26 +266,26 @@ class ImageMonitor:
                 img_dict[img_dir] = {
                             'link': url + a['href']
                         }
+                # print the image folder name
                 logging.info('  |- [' + img_dir +  ']')
                 response = self.session.get(url + a['href'])
                 bs = BeautifulSoup(response.text, 'html.parser')
 
+                image_info_dict = {}
                 rows = bs.find_all('tr', class_=['odd', 'even'])
                 # bypass the 1st row since it's the link back to Parent Directory
                 for row in rows[1:]:
                     for a in row.find_all('a', href=True):
-                        logging.info('    |- ' + a.get_text(strip=True))
 
                         if '.iso' in a.get_text(strip=True):
                             image_filename = a.get_text(strip=True)
                             image_link = response.url + image_filename
-                            logging.info('      |-' + image_link)
-                            image_info_list.append({
-                                'image_filename': image_filename,
-                                'image_link': image_link,
-                                })
+                            logging.info('    |- ' + image_filename)
+                            image_info_dict['image_filename'] = image_filename
+                            image_info_dict['image_link'] = image_link
+
                             if cate in self.img_release_history and not any(d.get('image_filename') == image_filename for d in self.img_release_history[cate]):
-                                logging.info('        |-[' + image_filename + '] is not downloaded yet,  adding to the queue')
+                                logging.info('      |-[' + image_filename + '] is not downloaded yet,  adding to the queue')
                                 self.img_download_queue.append({
                                     'image_filename': image_filename,
                                     'image_link': image_link,
@@ -301,10 +300,11 @@ class ImageMonitor:
 
                             if self.download_file(sbom_link, sbom_temp):
                                 kernel_version = get_kernel_ver_from_sbom(sbom_temp)
-                                image_info_list.append({
-                                    'kernel_version': kernel_version,
-                                })
+                                image_info_dict['kernel_version'] = kernel_version
                                 os.remove(sbom_temp)
+                                logging.info('      |- ' + kernel_version)
+
+                image_info_list.append(image_info_dict)
                         
         return image_info_list
 
