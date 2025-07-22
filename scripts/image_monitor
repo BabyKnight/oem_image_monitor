@@ -20,6 +20,8 @@ track_image_status(){
 		exit 1
 	fi
 
+	cd "$UTILITY_ROOT_DIR"
+
 	source "$VIRTUAL_ENV_ACTIVATE"
 
 	python "$PYTHON_SCRIPT" "$@"
@@ -29,8 +31,10 @@ track_image_status(){
 add_cron(){
 	cp "$SCRIPTS_DIR/image_monitor_cron_template" "$SCRIPTS_DIR/image_monitor_cron"
 	
-	sed -i "s/USER/$(whoami)/g" "$SCRIPTS_DIR/image_monitor_cron"
-	sed -i "s/FILE_PATH/$(SCRIPTS_DIR)/g" "$SCRIPTS_DIR/image_monitor_cron"
+	sed -i "s|USER|$(whoami)|g" "$SCRIPTS_DIR/image_monitor_cron"
+	sed -i "s|FILE_PATH|$SCRIPTS_DIR|g" "$SCRIPTS_DIR/image_monitor_cron"
+
+	sudo mv "$SCRIPTS_DIR/image_monitor_cron" "/etc/cron.d/"
 }
 
 
