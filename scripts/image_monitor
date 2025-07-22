@@ -8,14 +8,53 @@ UTILITY_ROOT_DIR=$(dirname "$SCRIPT_DIR")
 
 PYTHON_SCRIPT="$UTILITY_ROOT_DIR/image_monitor.py"
 
+SCRIPTS_DIR="$UTILITY_ROOT_DIR/scripts"
+
 VIRTUAL_ENV_ACTIVATE="$UTILITY_ROOT_DIR/environ/bin/activate"
 
-if [ ! -f "$VIRTUAL_ENV_ACTIVATE" ]; then
-	ehco "Virtual env not found: $VIRTUAL_ENV_ACTIVATE"
-	echo "Please run ./bootstrap first"
-	exit 1
+
+track_image_status(){
+	if [ ! -f "$VIRTUAL_ENV_ACTIVATE" ]; then
+		ehco "Virtual env not found: $VIRTUAL_ENV_ACTIVATE"
+		echo "Please run ./bootstrap first"
+		exit 1
+	fi
+
+	source "$VIRTUAL_ENV_ACTIVATE"
+
+	python "$PYTHON_SCRIPT" "$@"
+}
+
+
+add_cron(){
+	cp "$SCRIPTS_DIR/image_monitor_cron_template" "$SCRIPTS_DIR/image_monitor_cron"
+	
+	sed -i "s/USER/$(whoami)/g" "$SCRIPTS_DIR/image_monitor_cron"
+	sed -i "s/FILE_PATH/$(SCRIPTS_DIR)/g" "$SCRIPTS_DIR/image_monitor_cron"
+}
+
+
+show_usage(){
+	echo "Usage: $0  []/[--run]/[--add-cron]/[--help]"
+}
+
+
+if (( ! "$#")); then
+	track_image_status
+else
+	case "$1" in
+		--add-cron)
+			add_cron
+			;;
+		--run)
+			track_image_status
+			;;
+		--help)
+			show_usage
+			;;
+		*)
+			echo "Unknown option"
+			show_usage
+			;;
+	esac
 fi
-
-source "$VIRTUAL_ENV_ACTIVATE"
-
-python "$PYTHON_SCRIPT" "$@"
