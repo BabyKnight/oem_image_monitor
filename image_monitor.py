@@ -303,6 +303,15 @@ class ImageMonitor:
                                     'image_link': image_link,
                                     })
 
+                            last_modified = row.find('td', class_='indexcollastmod').get_text(strip=True)
+                            size = row.find('td', class_='indexcolsize').get_text(strip=True)
+
+                            logging.info('- Last Modified at: ' + last_modified)
+                            logging.info('- Image size is: ' + size)
+
+                            image_info_dict['last_modified'] = last_modified
+                            image_info_dict['size'] = size
+
                         if '.sha256sum' in a.get_text(strip=True):
                             checksum_filename = a.get_text(strip=True)
                             sha256sum_link = response.url + checksum_filename
