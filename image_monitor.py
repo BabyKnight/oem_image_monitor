@@ -98,6 +98,18 @@ def get_kernel_ver_from_sbom(sbom_file):
     return kern_ver
 
 
+def get_iso_sha256sum_from_file(checksum_file):
+    """
+    Method to get the iso sha256 checksum from the sha256sum file
+    """
+    if os.path.exists(checksum_file):
+        with open(checksum_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if '.iso' in line.strip():
+                    iso_sha256sum = line.strip().split(' ')[0]
+                    return iso_sha256sum
+
+
 class ImageMonitor:
 
     default_wait_sec = 10
@@ -214,7 +226,7 @@ class ImageMonitor:
 
         img_cate_dict = self.parse_category(response.text)
         for cate, v in img_cate_dict.items():
-            logging.info('[' + cate + ']')
+            logging.info('Image category [' + cate + '] found')
             self.img_release_history[cate] = self.parse_image_by_category(cate, v['link'])
 
         self.save_img_release_hist()
@@ -267,7 +279,7 @@ class ImageMonitor:
                             'link': url + a['href']
                         }
                 # print the image folder name
-                logging.info('  |- [' + img_dir +  ']')
+                logging.info('Image directory [' + img_dir +  '] found')
                 response = self.session.get(url + a['href'])
                 bs = BeautifulSoup(response.text, 'html.parser')
 
@@ -280,12 +292,12 @@ class ImageMonitor:
                         if '.iso' in a.get_text(strip=True):
                             image_filename = a.get_text(strip=True)
                             image_link = response.url + image_filename
-                            logging.info('    |- ' + image_filename)
+                            logging.info('Image iso file ' + image_filename + ' found')
                             image_info_dict['image_filename'] = image_filename
                             image_info_dict['image_link'] = image_link
 
                             if cate in self.img_release_history and not any(d.get('image_filename') == image_filename for d in self.img_release_history[cate]):
-                                logging.info('      |-[' + image_filename + '] is not downloaded yet,  adding to the queue')
+                                logging.info('[' + image_filename + '] is not downloaded yet,  adding to the queue')
                                 self.img_download_queue.append({
                                     'image_filename': image_filename,
                                     'image_link': image_link,
@@ -293,6 +305,15 @@ class ImageMonitor:
 
                         if '.sha256sum' in a.get_text(strip=True):
                             checksum_filename = a.get_text(strip=True)
+                            sha256sum_link = response.url + checksum_filename
+                            sha256sum_temp = os.path.join(DATA_PATH,checksum_filename)
+
+                            if self.download_file(sha256sum_link, sha256sum_temp):
+                                sha256sum = get_iso_sha256sum_from_file(sha256sum_temp)
+                                image_info_dict['sha256sum'] = sha256sum
+                                os.remove(sha256sum_temp)
+                                logging.info('- sha256sum: ' + sha256sum)
+
                         if '.sbom' in a.get_text(strip=True):
                             sbom_filename = a.get_text(strip=True)
                             sbom_link = response.url + sbom_filename
@@ -302,7 +323,7 @@ class ImageMonitor:
                                 kernel_version = get_kernel_ver_from_sbom(sbom_temp)
                                 image_info_dict['kernel_version'] = kernel_version
                                 os.remove(sbom_temp)
-                                logging.info('      |- ' + kernel_version)
+                                logging.info('- Kernel version: ' + kernel_version)
 
                 image_info_list.append(image_info_dict)
                         
