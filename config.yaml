@@ -1,0 +1,15 @@
+file_and_path:
+  data_path: data
+  saved_cookies: SESSION_DATA
+  released_image_data: RELEASED_IMAGE_DATA
+  image_download_queue: IMAGE_DOWNLOAD_QUEUE
+  image_download_path: data
+  keep_sbom: 0
+
+url:
+  base_url: https://oem-share.canonical.com/partners/somerville/share/releases/noble/
+
+logging:
+  log_path: logs
+  level: INFO
+  file: image_tracker.log

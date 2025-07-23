@@ -13,23 +13,62 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.firefox.options import Options
 
-DATA_PATH = 'data'
-LOG_PATH = 'logs'
-SAVED_COOKIES = os.path.join(DATA_PATH,'SESSION_DATA')
-RELEASED_IMAGE_DATA = os.path.join(DATA_PATH,'RELEASED_IMAGE_DATA')
-IMAGE_DOWNLOAD_QUEUE = os.path.join(DATA_PATH,'IMAGE_DOWNLOAD_QUEUE')
-BASE_URL = 'https://oem-share.canonical.com/partners/somerville/share/releases/noble/'
+
+CONFIG = {'DEFAULT_SETTING_FILE': 'config.yaml'}
 
 
-if not os.path.exists(LOG_PATH):
-    os.makedirs(LOG_PATH)
+def init_utility():
+    """
+    Define a unified method to include all necessary preliminary steps
+    """
+    load_config()
+    init_logging()
 
-logging.basicConfig(
-    filename=LOG_PATH + '/image_tracker.log',
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
+
+def load_config():
+    """
+    Loading the config file for the utility initialize
+    """
+    global CONFIG
+    if os.path.exists(CONFIG['DEFAULT_SETTING_FILE']):
+        with open(CONFIG['DEFAULT_SETTING_FILE'], 'r', encoding='utf-8') as f:
+            conf = yaml.safe_load(f)
+
+            CONFIG['DATA_PATH'] = conf['file_and_path']['data_path']
+            CONFIG['SAVED_COOKIES'] = os.path.join(CONFIG['DATA_PATH'], conf['file_and_path']['saved_cookies'])
+            CONFIG['RELEASED_IMAGE_DATA'] = os.path.join(CONFIG['DATA_PATH'], conf['file_and_path']['released_image_data'])
+            CONFIG['IMAGE_DOWNLOAD_QUEUE'] = os.path.join(CONFIG['DATA_PATH'], conf['file_and_path']['image_download_queue'])
+            CONFIG['IMAGE_DOWNLOAD_PATH'] = conf['file_and_path']['image_download_path']
+            CONFIG['BASE_URL'] = conf['url']['base_url']
+            CONFIG['LOG_PATH'] = conf['logging']['log_path']
+            CONFIG['LOG_LEVEL'] = conf['logging']['level']
+            CONFIG['LOG_FILE'] = conf['logging']['file']
+            CONFIG['KEEP_SBOM'] = conf['file_and_path']['keep_sbom']
+
+    else:
+        # the config file should be stored at the same directory as this python file
+        # please create/modify the config file or checkout the default config
+        # this should not happen but in case the config file been deleted
+        logging.error('Config file not found, please create the config file or checkout the default config')
+        sys.exit(0)
+
+
+def init_logging():
+    """
+    Initialize the logging
+    """
+    log_path = CONFIG['LOG_PATH']
+    if not os.path.exists(log_path):
+        os.makedirs(log_path)
+
+    log_level = getattr(logging, CONFIG['LOG_LEVEL'].upper(), logging.INFO)
+
+    logging.basicConfig(
+        filename=os.path.join(log_path, CONFIG['LOG_FILE']),
+        level=log_level,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
 
 
 def get_ubuntu_one_identity():
@@ -132,7 +171,7 @@ class ImageMonitor:
         cookies = self.driver.get_cookies()
         self.driver.quit()
 
-        with open(SAVED_COOKIES, 'w', encoding='utf-8') as f:
+        with open(CONFIG['SAVED_COOKIES'], 'w', encoding='utf-8') as f:
             json.dump(cookies, f, ensure_ascii=False)
             logging.info('Cookies in session updated and saved')
 
@@ -141,13 +180,13 @@ class ImageMonitor:
         Update the user session with saved cookie data or from webengine (driver)
         """
         # check if saved cookies available
-        if not os.path.exists(SAVED_COOKIES):
+        if not os.path.exists(CONFIG['SAVED_COOKIES']):
             logging.info('Saved cookie data not found')
             self.update_cookie()
         else:
             logging.info('Saved cookie data found')
 
-        with open(SAVED_COOKIES, 'r', encoding='utf-8') as f:
+        with open(CONFIG['SAVED_COOKIES'], 'r', encoding='utf-8') as f:
             content = f.read()
         try:
             cookies = json.loads(content)
@@ -161,7 +200,6 @@ class ImageMonitor:
         self.session = requests.Session()
         for cookie in cookies:
             self.session.cookies.set(cookie['name'], cookie['value'])
-
 
     def login(self):
         """
@@ -183,7 +221,7 @@ class ImageMonitor:
         service = Service('/snap/bin/geckodriver')
         self.driver = webdriver.Firefox(service=service, options=options)
 
-        self.driver.get(BASE_URL)
+        self.driver.get(CONFIG['BASE_URL'])
         self.driver.switch_to.window(self.driver.window_handles[0])
 
         self.__wait_for_page_loading()
@@ -216,13 +254,13 @@ class ImageMonitor:
 
         self.update_session()
 
-        response = self.session.get(BASE_URL)
+        response = self.session.get(CONFIG['BASE_URL'])
 
         # check if session expire
         while self.is_session_expire(response):
             self.update_cookie()
             self.update_session()
-            response = self.session.get(BASE_URL)
+            response = self.session.get(CONFIG['BASE_URL'])
 
         img_cate_dict = self.parse_category(response.text)
         for cate, v in img_cate_dict.items():
@@ -255,7 +293,7 @@ class ImageMonitor:
                 # skip when the folder name is 'sideload'
                 if img_cate != 'sideload':
                     img_cate_dict[img_cate] = {
-                            'link': BASE_URL + a['href']
+                            'link': CONFIG['BASE_URL'] + a['href']
                             }
 
         return img_cate_dict
@@ -315,7 +353,7 @@ class ImageMonitor:
                         if '.sha256sum' in a.get_text(strip=True):
                             checksum_filename = a.get_text(strip=True)
                             sha256sum_link = response.url + checksum_filename
-                            sha256sum_temp = os.path.join(DATA_PATH,checksum_filename)
+                            sha256sum_temp = os.path.join(CONFIG['DATA_PATH'], checksum_filename)
 
                             if self.download_file(sha256sum_link, sha256sum_temp):
                                 sha256sum = get_iso_sha256sum_from_file(sha256sum_temp)
@@ -326,12 +364,13 @@ class ImageMonitor:
                         if '.sbom' in a.get_text(strip=True):
                             sbom_filename = a.get_text(strip=True)
                             sbom_link = response.url + sbom_filename
-                            sbom_temp = os.path.join(DATA_PATH,sbom_filename)
+                            sbom_temp = os.path.join(CONFIG['DATA_PATH'], sbom_filename)
 
                             if self.download_file(sbom_link, sbom_temp):
                                 kernel_version = get_kernel_ver_from_sbom(sbom_temp)
                                 image_info_dict['kernel_version'] = kernel_version
-                                os.remove(sbom_temp)
+                                if not int(CONFIG['KEEP_SBOM']) == 1:
+                                    os.remove(sbom_temp)
                                 logging.info('- Kernel version: ' + kernel_version)
 
                 image_info_list.append(image_info_dict)
@@ -344,8 +383,8 @@ class ImageMonitor:
         Return/initial a json data which cal be used for checking if image has been recorded & downloaded
         """
         # if the file for history data is not exist, leave it for saving method to create the file
-        if os.path.exists(RELEASED_IMAGE_DATA):
-            with open(RELEASED_IMAGE_DATA, 'r', encoding='utf-8') as f:
+        if os.path.exists(CONFIG['RELEASED_IMAGE_DATA']):
+            with open(CONFIG['RELEASED_IMAGE_DATA'], 'r', encoding='utf-8') as f:
                 self.img_release_history = json.load(f)
                 logging.info('Image historical data found in local')
 
@@ -355,14 +394,14 @@ class ImageMonitor:
         """
         logging.info('Saving the image historical data to local')
         # create a new file if not exists
-        with open(RELEASED_IMAGE_DATA, 'w', encoding='utf-8') as f:
+        with open(CONFIG['RELEASED_IMAGE_DATA'], 'w', encoding='utf-8') as f:
             json.dump(self.img_release_history, f, indent=4, ensure_ascii=False)
 
     def save_img_download_queue(self):
         # create a new file if not exists, overwrite if file exists
         logging.info('Refreshing the image download queue')
         logging.info('[' + str(len(self.img_download_queue)) + '] images in the download queue')
-        with open(IMAGE_DOWNLOAD_QUEUE, 'w', encoding='utf-8') as f:
+        with open(CONFIG['IMAGE_DOWNLOAD_QUEUE'], 'w', encoding='utf-8') as f:
             json.dump(self.img_download_queue, f, indent=4, ensure_ascii=False)
 
     def download_image_in_queue(self):
@@ -373,7 +412,7 @@ class ImageMonitor:
             with self.session.get(image['image_link'], stream=True) as res:
                 logging.info('Starting to download the new image [' + image['image_filename'] + ']')
                 res.raise_for_status()
-                with open(os.path.join(DATA_PATH,image['image_filename']), 'wb') as f:
+                with open(os.path.join(CONFIG['IMAGE_DOWNLOAD_PATH'] , image['image_filename']), 'wb') as f:
                     for chunk in res.iter_content(chunk_size=1024*1024):
                         if chunk:
                             f.write(chunk)
@@ -399,6 +438,7 @@ class ImageMonitor:
 
 
 if __name__ == '__main__':
+    init_utility()
     image_tracker = ImageMonitor()
     image_tracker.check_for_updates()
     sys.exit(0)
