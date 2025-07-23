@@ -3,7 +3,9 @@ file_and_path:
   saved_cookies: SESSION_DATA
   released_image_data: RELEASED_IMAGE_DATA
   image_download_queue: IMAGE_DOWNLOAD_QUEUE
-  image_download_path: data
+  # the directory for image download, will use the default as data_path if not set
+  # need to be set with a complete absolute path
+  #image_download_path: /tmp
   keep_sbom: 0
 
 url:
