@@ -4,7 +4,7 @@ file_and_path:
   released_image_data: RELEASED_IMAGE_DATA
   image_download_queue: IMAGE_DOWNLOAD_QUEUE
   # set with a complete absolute path (e.g. /tmp) or relative path for current file path (e.g. data)
-  image_download_path: /tmp
+  image_download_path: data
   keep_sbom: 0
 
 url:
