@@ -43,13 +43,7 @@ def load_config():
             CONFIG['LOG_LEVEL'] = conf['logging']['level']
             CONFIG['LOG_FILE'] = conf['logging']['file']
             CONFIG['KEEP_SBOM'] = conf['file_and_path']['keep_sbom']
-
-            if 'image_download_path' not in conf['file_and_path']:
-                CONFIG['IMAGE_DOWNLOAD_PATH'] = conf['file_and_path']['data_path']
-            else:
-                CONFIG['IMAGE_DOWNLOAD_PATH'] = conf['file_and_path']['image_download_path']
-
-
+            CONFIG['IMAGE_DOWNLOAD_PATH'] = conf['file_and_path']['image_download_path']
     else:
         # the config file should be stored at the same directory as this python file
         # please create/modify the config file or checkout the default config

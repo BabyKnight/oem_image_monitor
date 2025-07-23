@@ -3,15 +3,15 @@ file_and_path:
   saved_cookies: SESSION_DATA
   released_image_data: RELEASED_IMAGE_DATA
   image_download_queue: IMAGE_DOWNLOAD_QUEUE
-  # the directory for image download, will use the default as data_path if not set
-  # need to be set with a complete absolute path
-  #image_download_path: /tmp
+  # set with a complete absolute path (e.g. /tmp) or relative path for current file path (e.g. data)
+  image_download_path: /tmp
   keep_sbom: 0
 
 url:
   base_url: https://oem-share.canonical.com/partners/somerville/share/releases/noble/
 
 logging:
+  # set with a complete absolute path (e.g. /var/log) or relative path for current file path (e.g. logs)
   log_path: logs
   level: INFO
-  file: image_tracker.log
+  file: oem_image_monitor.log
