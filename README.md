@@ -36,6 +36,8 @@ OEM image monitor is a tool to monitor the Ubuntu OEM image release status and d
 
   - Modify the settings in file 'config.yaml'
 
+  > Please note: When specifying the file or log save directory, make sure you have the necessary permissions for that directory. Otherwise, please run the command/utility as root user.
+
 - Use below command to deploy the cron (Optional)
 
   -  ./scripts/image_monitor --add-cron
