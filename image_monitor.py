@@ -7,7 +7,6 @@ import sys
 import time
 import yaml
 from bs4 import BeautifulSoup
-from datetime import date
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.service import Service
@@ -29,7 +28,7 @@ def load_config():
     """
     Loading the config file for the utility initialize
     """
-    global CONFIG
+    # global CONFIG
     if os.path.exists(CONFIG['DEFAULT_SETTING_FILE']):
         with open(CONFIG['DEFAULT_SETTING_FILE'], 'r', encoding='utf-8') as f:
             conf = yaml.safe_load(f)
@@ -121,9 +120,9 @@ def pasre_sbom(sbom_file, pkg_name=None):
     except FileNotFoundError:
         logging.error('no sbom file found')
     except yaml.YAMLError as e:
-        logging.error('Parsing sbom error {e}')
+        logging.error('Parsing sbom error: %s', e)
     except Exception as e:
-        logging.error('Unknown error {e}')
+        logging.error('Unknown error: %s', e)
 
 
 def get_kernel_ver_from_sbom(sbom_file):
@@ -296,7 +295,7 @@ class ImageMonitor:
                             }
 
         return img_cate_dict
-        
+
     def parse_image_by_category(self, cate, url):
         """
         method to parse image by category
@@ -316,7 +315,7 @@ class ImageMonitor:
                             'link': url + a['href']
                         }
                 # print the image folder name
-                logging.info('Image directory [' + img_dir +  '] found')
+                logging.info('Image directory [' + img_dir + '] found')
                 response = self.session.get(url + a['href'])
                 bs = BeautifulSoup(response.text, 'html.parser')
 
@@ -373,7 +372,7 @@ class ImageMonitor:
                                 logging.info('- Kernel version: ' + kernel_version)
 
                 image_info_list.append(image_info_dict)
-                        
+
         return image_info_list
 
     def get_img_release_hist(self):
@@ -411,7 +410,7 @@ class ImageMonitor:
             with self.session.get(image['image_link'], stream=True) as res:
                 logging.info('Starting to download the new image [' + image['image_filename'] + ']')
                 res.raise_for_status()
-                with open(os.path.join(CONFIG['IMAGE_DOWNLOAD_PATH'] , image['image_filename']), 'wb') as f:
+                with open(os.path.join(CONFIG['IMAGE_DOWNLOAD_PATH'], image['image_filename']), 'wb') as f:
                     for chunk in res.iter_content(chunk_size=1024*1024):
                         if chunk:
                             f.write(chunk)
@@ -432,7 +431,7 @@ class ImageMonitor:
 
             return True
         except Exception as e:
-            logging.error('File download fail with exception')
+            logging.error('File download fail with exception: %s', e)
             return False
 
 
