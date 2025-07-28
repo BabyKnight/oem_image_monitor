@@ -59,3 +59,15 @@ New released image will be downloaded to the path which set in config.yaml
 Released image information will be saved at a json file which set in config.yaml
 
 > e.g. released_image_data: RELEASED_IMAGE_DATA
+
+## Contributing
+
+- Environment
+
+  - The project is developed based on Python 3.12 (earlier version are not verified), please use 3.12 or newer version to make sure it's compatible with the current code
+
+  - Please use virtualenv for this project
+
+- Coding style
+
+  - Before submit PR, please make sure it passed flake8
