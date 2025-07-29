@@ -1,0 +1,14 @@
+Package: autossh-installer
+Architecture: all
+Version: 1.0
+Priority: optional
+Section: utils
+Maintainer: Chris_li_Q <chris_li_q@dell.com>
+Filename: ./autossh-installer_1.0_all.deb
+Size: 958
+MD5sum: b9106dac87e2e156b8059864ffe6b86f
+SHA1: 51d18f94ff28f463c1bbe2f5e23ffd63c0284096
+SHA256: 55068de52a9466b322bba15c94852064bdfc563f06aa10a2455ebb7e5fdce2af
+SHA512: 1a9fa2512d9e1dd31321c915fff4a05c07776aa7f2ec858647bc12e1415fc6d9a437a420171f42a7b58487b4a155beb7a9b332867bbadb541d0baa6775a04343
+Description: Install openssh server after GUI login
+
