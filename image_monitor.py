@@ -43,6 +43,8 @@ def load_config():
             CONFIG['LOG_FILE'] = conf['logging']['file']
             CONFIG['KEEP_SBOM'] = conf['file_and_path']['keep_sbom']
             CONFIG['IMAGE_DOWNLOAD_PATH'] = conf['file_and_path']['image_download_path']
+            CONFIG['EXTENSION_ENABLED'] = conf['extension']['enabled']
+            CONFIG['EXTENSION_URL'] = conf['extension']['url']
     else:
         # the config file should be stored at the same directory as this python file
         # please create/modify the config file or checkout the default config
@@ -145,6 +147,29 @@ def get_iso_sha256sum_from_file(checksum_file):
                 if '.iso' in line.strip():
                     iso_sha256sum = line.strip().split(' ')[0]
                     return iso_sha256sum
+
+
+def add_image_info():
+    """
+    Method to update image info (send data to server)
+    """
+    url = CONFIG['EXTENSION_URL'] 
+    data = {
+        "name":"somerville-noble-oem-24.04b-proposed-20250604-521.iso",
+        "cat":"proposed",
+        "img_ver":"521",
+        "kern_ver":"6.11.0.1023",
+        "date":"2025-08-18",
+        "path":"/tmp/",
+        "size":"6.5",
+        "checksum":"a016da8152a265ce068b0bffcc2a2616f0f9eff004fbc5ef8f8e9e0322c2c55e",
+    }
+
+    res = requests.post(url,  data=data)
+    if res.text == 0:
+        logging.error('Adding image info success')
+    else:
+        logging.error('Adding image info failed with return code %s', res.text)
 
 
 class ImageMonitor:
