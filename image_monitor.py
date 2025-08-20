@@ -149,20 +149,50 @@ def get_iso_sha256sum_from_file(checksum_file):
                     return iso_sha256sum
 
 
-def add_image_info():
+def get_image_version_from_filename(img_filename):
+    """
+    Method to get the image version from a given image filename
+    """
+    if img_filename and img_filename[-4:] == '.iso':
+        img_ver = image_filename.split('.iso')[0].split('-')[-1]
+    else:
+        img_ver = None
+    return img_ver
+
+
+def get_image_category(cate_folder_name):
+    """
+    Method to get the image category from the folder name
+    valid category:
+        - edge
+        - next
+        - proposed
+        - production
+    """
+    valid_cat = ['edge', 'next', 'proposed', 'production']
+    posible_cat = cate_folder_name.split('-')[-1]
+    if posible_cat in valid_cat:
+        return posible_cat
+    else:
+        return 'production'
+
+
+def add_image_info(img_name, kern_ver, date_str, path, size, checksum, img_cat, img_ver=None):
     """
     Method to update image info (send data to server)
     """
-    url = CONFIG['EXTENSION_URL'] 
+    url = CONFIG['EXTENSION_URL']
+    release_date = datetime.strptime(date_str, "%Y-%m-%d %H:%M")
+
     data = {
-        "name":"somerville-noble-oem-24.04b-proposed-20250604-521.iso",
-        "cat":"proposed",
-        "img_ver":"521",
-        "kern_ver":"6.11.0.1023",
-        "date":"2025-08-18",
-        "path":"/tmp/",
-        "size":"6.5",
-        "checksum":"a016da8152a265ce068b0bffcc2a2616f0f9eff004fbc5ef8f8e9e0322c2c55e",
+        "name": img_name,
+        "cat": img_cat,
+        "img_ver": img_ver,
+        "kern_ver": kern_ver,
+        "date": release_date,
+        "path": path,
+        "size":size,
+        "checksum": checksum,
     }
 
     res = requests.post(url,  data=data)
@@ -344,11 +374,19 @@ class ImageMonitor:
                 response = self.session.get(url + a['href'])
                 bs = BeautifulSoup(response.text, 'html.parser')
 
-                image_info_dict = {}
-                rows = bs.find_all('tr', class_=['odd', 'even'])
+                image_info_dict = {
+                        'image_cate': cate,
+                        'image_version': None,
+                        'kernel_version': 'Unknown',
+                        }
+                rows_for_a_img = bs.find_all('tr', class_=['odd', 'even'])
                 # bypass the 1st row since it's the link back to Parent Directory
-                for row in rows[1:]:
-                    for a in row.find_all('a', href=True):
+
+                new_released = False
+                for row_in_img_dir in rows_for_a_img[1:]:
+
+                    kernel_version = ""
+                    for a in row_in_img_dir.find_all('a', href=True):
 
                         if '.iso' in a.get_text(strip=True):
                             image_filename = a.get_text(strip=True)
@@ -357,15 +395,16 @@ class ImageMonitor:
                             image_info_dict['image_filename'] = image_filename
                             image_info_dict['image_link'] = image_link
 
-                            if cate in self.img_release_history and not any(d.get('image_filename') == image_filename for d in self.img_release_history[cate]):
+                            if cate not in self.img_release_history or (cate in self.img_release_history and not any(d.get('image_filename') == image_filename for d in self.img_release_history[cate])):
                                 logging.info('[' + image_filename + '] is not downloaded yet,  adding to the queue')
                                 self.img_download_queue.append({
                                     'image_filename': image_filename,
                                     'image_link': image_link,
                                     })
+                                new_released = True
 
-                            last_modified = row.find('td', class_='indexcollastmod').get_text(strip=True)
-                            size = row.find('td', class_='indexcolsize').get_text(strip=True)
+                            last_modified = row_in_img_dir.find('td', class_='indexcollastmod').get_text(strip=True)
+                            size = row_in_img_dir.find('td', class_='indexcolsize').get_text(strip=True)
 
                             logging.info('- Last Modified at: ' + last_modified)
                             logging.info('- Image size is: ' + size)
@@ -395,6 +434,9 @@ class ImageMonitor:
                                 if not int(CONFIG['KEEP_SBOM']) == 1:
                                     os.remove(sbom_temp)
                                 logging.info('- Kernel version: ' + kernel_version)
+
+                if new_released and CONFIG['EXTENSION_ENABLED']:
+                    add_image_info(image_filename, kernel_version, last_modified, '/tmp', size, sha256sum, get_image_category(cate), '')
 
                 image_info_list.append(image_info_dict)
 
