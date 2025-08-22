@@ -154,7 +154,7 @@ def get_image_version_from_filename(img_filename):
     Method to get the image version from a given image filename
     """
     if img_filename and img_filename[-4:] == '.iso':
-        img_ver = image_filename.split('.iso')[0].split('-')[-1]
+        img_ver = img_filename.split('.iso')[0].split('-')[-1]
     else:
         img_ver = None
     return img_ver
@@ -182,14 +182,13 @@ def add_image_info(img_name, kern_ver, date_str, path, size, checksum, img_cat, 
     Method to update image info (send data to server)
     """
     url = CONFIG['EXTENSION_URL']
-    release_date = datetime.strptime(date_str, "%Y-%m-%d %H:%M")
 
     data = {
         "name": img_name,
         "cat": img_cat,
         "img_ver": img_ver,
         "kern_ver": kern_ver,
-        "date": release_date,
+        "date": date_str,
         "path": path,
         "size":size,
         "checksum": checksum,
@@ -383,9 +382,15 @@ class ImageMonitor:
                 # bypass the 1st row since it's the link back to Parent Directory
 
                 new_released = False
+                image_filename = ""
+                kernel_version = ""
+                last_modified = ""
+                size = ""
+                cate = ""
+                sha256sum = ""
+
                 for row_in_img_dir in rows_for_a_img[1:]:
 
-                    kernel_version = ""
                     for a in row_in_img_dir.find_all('a', href=True):
 
                         if '.iso' in a.get_text(strip=True):
@@ -436,7 +441,7 @@ class ImageMonitor:
                                 logging.info('- Kernel version: ' + kernel_version)
 
                 if new_released and CONFIG['EXTENSION_ENABLED']:
-                    add_image_info(image_filename, kernel_version, last_modified, '/tmp', size.rstrip('G'), sha256sum, get_image_category(cate), '')
+                    add_image_info(image_filename, kernel_version, last_modified, CONFIG['IMAGE_DOWNLOAD_PATH'], size.rstrip('G'), sha256sum, get_image_category(cate), get_image_version_from_filename(image_filename))
 
                 image_info_list.append(image_info_dict)
 
