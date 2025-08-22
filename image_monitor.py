@@ -436,7 +436,7 @@ class ImageMonitor:
                                 logging.info('- Kernel version: ' + kernel_version)
 
                 if new_released and CONFIG['EXTENSION_ENABLED']:
-                    add_image_info(image_filename, kernel_version, last_modified, '/tmp', size, sha256sum, get_image_category(cate), '')
+                    add_image_info(image_filename, kernel_version, last_modified, '/tmp', size.rstrip('G'), sha256sum, get_image_category(cate), '')
 
                 image_info_list.append(image_info_dict)
 

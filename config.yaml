@@ -19,4 +19,4 @@ logging:
 extension:
   # By enable extension, the utility will update the new released image info to specific server
   enabled: True
-  url: http://localhost:9090/api/image/add/
+  url: http://localhost:80/api/image/add/
