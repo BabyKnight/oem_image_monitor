@@ -196,9 +196,9 @@ def add_image_info(img_name, kern_ver, date_str, path, size, checksum, img_cat, 
 
     res = requests.post(url,  data=data)
     if res.text == 0:
-        logging.error('Adding image info success')
+        logging.info('Adding image info success')
     else:
-        logging.error('Adding image info failed with return code %s', res.text)
+        logging.info('Adding image info failed with return code %s', res.text)
 
 
 class ImageMonitor:
@@ -386,7 +386,7 @@ class ImageMonitor:
                 kernel_version = ""
                 last_modified = ""
                 size = ""
-                cate = ""
+                #cate = ""
                 sha256sum = ""
 
                 for row_in_img_dir in rows_for_a_img[1:]:
